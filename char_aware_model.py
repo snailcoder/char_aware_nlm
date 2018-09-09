@@ -127,14 +127,14 @@ class CharAwareModel(object):
 
     def train(self, loss, global_step):
         with tf.name_scope("train"):
-            optimizer = tf.train.GradientDescentOptimizer(
-                learning_rate=self.learning_rate)
-            grads, vars = zip(*optimizer.compute_gradients(loss))
             if self.is_training:
+                optimizer = tf.train.GradientDescentOptimizer(
+                    learning_rate=self.learning_rate)
+                grads, vars = zip(*optimizer.compute_gradients(loss))
                 grads, _ = tf.clip_by_global_norm(grads, self.clip_norm)
-            train_op = optimizer.apply_gradients(
-                zip(grads, vars), global_step=global_step)
-            return train_op
+                train_op = optimizer.apply_gradients(
+                    zip(grads, vars), global_step=global_step)
+                return train_op
 
     def inference(self, char_embeddings):
         # char_embeddings.shape = [batch_size, seq_len, max_word_len, char_embed_size]
@@ -162,7 +162,7 @@ class CharAwareModel(object):
     def loss(self, logits):
         # logits.shape = [batch_size, seq_len, word_vocab_size]
         with tf.name_scope("loss"):
-            # loss.shape = [batch_size]
+            # loss.shape = [seq_len]
             loss = tf.contrib.seq2seq.sequence_loss(
                 logits,
                 self.input_y,

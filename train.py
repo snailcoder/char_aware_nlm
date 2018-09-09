@@ -58,12 +58,19 @@ def run_epoch(char_model, session, train_op, loss, raw_data,
         data_utils.data_iterator(raw_data, batch_size, char_model.seq_len)):
         X_char_batch = data_utils.word_ids_to_char_ids(
             X_batch, id_word_map, char_id_map, FLAGS.max_word_len)
-        _, cost = session.run(
-            [train_op, loss],
-            feed_dict={
-                char_model.input_X: X_char_batch,
-                char_model.input_y: y_batch,
-                char_model.learning_rate: learning_rate})
+        if char_model.is_training:
+            _, cost = session.run(
+                [train_op, loss],
+                feed_dict={
+                    char_model.input_X: X_char_batch,
+                    char_model.input_y: y_batch,
+                    char_model.learning_rate: learning_rate})
+        else:
+            cost = session.run(
+                loss,
+                feed_dict={
+                    char_model.input_X: X_char_batch,
+                    char_model.input_y: y_batch})
         if i % (epoch_size / 10) == 10:
             print("Step %d, cost: %f" % (i, cost))
         total_cost += cost
@@ -149,6 +156,7 @@ def main(_):
                 if prev_valid_ppl - valid_ppl < 1.0:
                     lr /= 2.0
                     print("Halve learning rate: %f" % lr)
+                prev_valid_ppl = valid_ppl
             test_ppl = run_epoch(
                 char_model_test, sess, test_train_op, test_loss, test_data,
                 id_word_map, char_id_map, FLAGS.batch_size, FLAGS.learning_rate)
