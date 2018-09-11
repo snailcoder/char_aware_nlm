@@ -24,6 +24,7 @@ tf.flags.DEFINE_integer("num_highway_layer", 2, "number of highway layers")
 tf.flags.DEFINE_integer("num_lstm_layer", 2, "number of layers in the LSTM")
 tf.flags.DEFINE_integer("lstm_hidden_size", 650, "size of LSTM internal state")
 tf.flags.DEFINE_float("clip_norm", 5.0, "normalize gradients at")
+tf.flags.DEFINE_float("init_scale", 0.05, "the initial scale of tensors")
 tf.flags.DEFINE_float(
     "keep_prob", 0.5,
     "the probability of keeping weights in the dropout layer")
@@ -91,7 +92,9 @@ def main(_):
     word_vocab_size = len(word_id_map)
     char_vocab_size = len(char_id_map)
     with tf.Graph().as_default():
-        with tf.variable_scope("model", reuse=None):
+        initializer = tf.random_uniform_initializer(
+            -FLAGS.init_scale, FLAGS.init_scale)
+        with tf.variable_scope("model", reuse=None, initializer=initializer):
             char_model_train = char_aware_model.CharAwareModel(
                 FLAGS.seq_len,
                 char_vocab_size + 3,
@@ -107,7 +110,7 @@ def main(_):
                 FLAGS.keep_prob,
                 is_training=True)
             train_train_op, train_loss = get_ops(char_model_train)
-        with tf.variable_scope("model", reuse=True):
+        with tf.variable_scope("model", reuse=True, initializer=initializer):
             char_model_valid = char_aware_model.CharAwareModel(
                 FLAGS.seq_len,
                 char_vocab_size + 3,
@@ -123,7 +126,7 @@ def main(_):
                 FLAGS.keep_prob,
                 is_training=False)
             valid_train_op, valid_loss = get_ops(char_model_valid)
-        with tf.variable_scope("model", reuse=True):
+        with tf.variable_scope("model", reuse=True, initializer=initializer):
             char_model_test = char_aware_model.CharAwareModel(
                 FLAGS.seq_len,
                 char_vocab_size + 3,

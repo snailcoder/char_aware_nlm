@@ -30,8 +30,7 @@ class CharAwareModel(object):
             embeddings = tf.get_variable(
                 "char_embedding",
                 shape=[self.char_vocab_size, self.char_embed_size],
-                dtype=tf.float32,
-                initializer=tf.contrib.layers.xavier_initializer())
+                dtype=tf.float32)
             embed = tf.nn.embedding_lookup(embeddings, self.input_X)
             return embed
 
@@ -44,8 +43,7 @@ class CharAwareModel(object):
                 filters = tf.get_variable(
                     "filter",
                     shape=[width, self.char_embed_size, 1, out_channels],
-                    dtype=tf.float32,
-                    initializer=tf.contrib.layers.xavier_initializer())
+                    dtype=tf.float32)
                 b = tf.get_variable(
                     "bias",
                     initializer=tf.constant(0.1, shape=[out_channels]))
@@ -68,7 +66,6 @@ class CharAwareModel(object):
                 all_pools.append(pool)
         # concat all pools along the dimension of out channels
         joined_pool = tf.concat(all_pools, axis=3)
-        # total_num_filter = len(self.filter_widths) * self.num_filters
         total_num_filter = sum(self.num_filters)
         flat_pool = tf.reshape(
             joined_pool, shape=[-1, total_num_filter])
@@ -78,13 +75,11 @@ class CharAwareModel(object):
         input_size = X.shape[1].value
         with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
             W_H = tf.get_variable(
-                "W_H", shape=[input_size, input_size], dtype=tf.float32,
-                initializer=tf.contrib.layers.xavier_initializer())
+                "W_H", shape=[input_size, input_size], dtype=tf.float32)
             b_H = tf.get_variable(
                 "b_H", initializer=tf.add(tf.zeros([input_size], tf.float32), -3))
             W_T = tf.get_variable(
-                "W_H", shape=[input_size, input_size], dtype=tf.float32,
-                initializer=tf.contrib.layers.xavier_initializer())
+                "W_H", shape=[input_size, input_size], dtype=tf.float32)
             b_T = tf.get_variable(
                 "b_T", initializer=tf.add(tf.zeros([input_size], tf.float32), -3))
             H_out = tf.nn.relu(tf.nn.xw_plus_b(X, W_H, b_H), name="H_out")
@@ -101,7 +96,22 @@ class CharAwareModel(object):
                     input_keep_prob=self.keep_prob,
                     output_keep_prob=self.keep_prob)
             return cell
+        # Do NOT invoke tf.nn.rnn_cell.MultiRNNCell like this:
+        #
         # multi_layer_cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self.num_lstm_layer)
+        #
+        # Otherwise, tf would throw ValueError that argue "Dimensions must be equal...".
+        # Simplely, think about following code snippet:
+        #
+        # l = [1, 2, 3]
+        # ll = [l] * 3
+        # print(ll) --> [[1, 2, 3], [1, 2, 3], [1, 2, 3]]
+        # l[0] = 4
+        # print(ll) --> [[4, 2, 3], [4, 2, 3], [4, 2, 3]]
+        #
+        # As you see, all lists in ll is just a reference of l. The multiplication
+        # operator on list doesn't copy its elements. So [cell] * self.num_lstm_layer
+        # will trigger that ValueError.
         multi_layer_cell = tf.nn.rnn_cell.MultiRNNCell(
             [make_cell() for _ in range(self.num_lstm_layer)])
         outputs, states = tf.nn.dynamic_rnn(multi_layer_cell, X, dtype=tf.float32)
@@ -113,8 +123,7 @@ class CharAwareModel(object):
             W_softmax = tf.get_variable(
                 "W_softmax",
                 shape=[self.lstm_hidden_size, self.word_vocab_size],
-                dtype=tf.float32,
-                initializer=tf.contrib.layers.xavier_initializer())
+                dtype=tf.float32)
             b_softmax = tf.get_variable(
                 "b_softmax", shape=[self.word_vocab_size], dtype=tf.float32)
             # Do NOT use tf.nn.xw_plus_b or tf.matmul, otherwise tensorflow
@@ -143,8 +152,8 @@ class CharAwareModel(object):
         char_embeds = tf.reshape(
             char_embeddings, shape=[-1, self.max_word_len, self.char_embed_size])
         conv_in = tf.expand_dims(char_embeds, -1)
-        # conv_out.shape = [new_batch_size, total_pooling_size],where
-        # total_pooling_size = len(filter_widths) * num_filters
+        # conv_out.shape = [new_batch_size, total_pooling_size], where
+        # total_pooling_size = sum(self.num_filters)
         conv_out = self._conv_layer(conv_in)
         highway = conv_out
         for i in range(self.num_highway_layer):
